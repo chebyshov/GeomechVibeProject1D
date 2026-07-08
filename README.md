@@ -15,3 +15,16 @@ claude
 Current state: the repository has been initialized and connected to GitHub.
 Project source files can be added here as the work develops.
 
+## 1D Geomechanics HTML Model
+
+Open `index.html` in a browser to run the current prototype. The page can:
+
+- parse a LAS file from upload;
+- auto-load `data/pes1.las`, `pes1.las`, `well.las`, or `data/well.las` when one is added to git;
+- build simple 1D elastic-property correlations;
+- calculate a poroelastic stress model for normal stress regime;
+- calculate a first-pass wellbore stability window;
+- plot GR, porosity, elastic properties, stresses, WBS, and caliper tracks;
+- recalibrate `Shmin` from a user-specified calibration point.
+
+If no LAS file is present, the app starts with a synthetic fallback dataset so the model and plots are still visible.
