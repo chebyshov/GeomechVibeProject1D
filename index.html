@@ -330,7 +330,7 @@
         <span><i style="background:#dc2626"></i>Fracture MW</span>
       </div>
       <p class="note">
-        Временные корреляции намеренно простые: Fang считается по gamma ray, UCS и упругие свойства выводятся из sonic/density или fallback-корреляций. Когда `pes1` добавит LAS в git, положите его в `data/pes1.las` или загрузите вручную.
+        Временные корреляции намеренно простые: Fang считается по gamma ray, UCS и упругие свойства выводятся из sonic/density или fallback-корреляций. По умолчанию страница загружает `West_Siberia_Well1_4000m.las`; другой LAS можно загрузить вручную.
       </p>
     </aside>
   </main>
@@ -800,7 +800,7 @@
     }
 
     async function tryAutoLoad() {
-      const candidates = ["data/pes1.las", "pes1.las", "well.las", "data/well.las"];
+      const candidates = ["West_Siberia_Well1_4000m.las", "data/pes1.las", "pes1.las", "well.las", "data/well.las"];
       for (const path of candidates) {
         try {
           const response = await fetch(path, { cache: "no-store" });
