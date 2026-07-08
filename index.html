@@ -241,6 +241,47 @@
       margin-top: 13px;
     }
 
+    .cal-points {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      margin: 4px 0 11px;
+    }
+
+    .cal-point-empty {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .cal-point-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      background: #f8fafc;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 5px 8px;
+      font-size: 12px;
+    }
+
+    .cal-point-remove {
+      background: transparent;
+      color: var(--red);
+      border: 0;
+      padding: 0 4px;
+      font-weight: 700;
+      font-size: 13px;
+    }
+
+    .litho-legend {
+      grid-template-columns: 1fr;
+      font-size: 11.5px;
+      max-height: 220px;
+      overflow-y: auto;
+      padding-right: 4px;
+    }
+
     @media (max-width: 1100px) {
       main {
         grid-template-columns: 1fr;
@@ -304,18 +345,19 @@
         </select>
       </div>
       <div class="field">
-        <label for="calDepth">Глубина точки, m</label>
+        <label for="calDepth">Глубина точки (LOT/minifrac), m</label>
         <input id="calDepth" type="number" step="0.1">
       </div>
       <div class="field">
-        <label for="calShmin">Shmin в точке, MPa</label>
+        <label for="calShmin">Измеренный Shmin, MPa</label>
         <input id="calShmin" type="number" step="0.1">
       </div>
+      <button id="addCalPointBtn" type="button">Добавить точку и пересчитать</button>
+      <div class="cal-points" id="calPointsList"></div>
       <div class="field">
         <label for="mudWeight">Текущий mud weight, SG</label>
         <input id="mudWeight" type="number" min="0.8" max="2.8" step="0.01" value="1.20">
       </div>
-      <button id="recalcBtn" type="button">Пересчитать стрессы и WBS</button>
       <div class="status" id="status">Загрузите LAS-файл или используйте пример.</div>
 
       <h3>Кривые</h3>
@@ -328,9 +370,14 @@
         <span><i style="background:#c2410c"></i>SHmax</span>
         <span><i style="background:#0891b2"></i>Collapse MW</span>
         <span><i style="background:#dc2626"></i>Fracture MW</span>
+        <span><i style="background:#7c3aed;border-radius:50%"></i>Точка LOT/minifrac (◆ на графике)</span>
       </div>
+
+      <h3>Литология планшета</h3>
+      <div class="legend litho-legend" id="lithoLegend"></div>
+
       <p class="note">
-        Временные корреляции намеренно простые: Fang считается по gamma ray, UCS и упругие свойства выводятся из sonic/density или fallback-корреляций. По умолчанию страница загружает `West_Siberia_Well1_4000m.las`; другой LAS можно загрузить вручную.
+        Временные корреляции намеренно простые: Fang считается по gamma ray, UCS и упругие свойства выводятся из sonic/density или fallback-корреляций. Литозоны — условная привязка к типовой стратиграфии Западной Сибири (свиты) по глубине; для реальной скважины замените диапазоны на данные по стратиграфической разбивке. По умолчанию страница загружает `West_Siberia_Well1_4000m.las`; другой LAS можно загрузить вручную.
       </p>
     </aside>
   </main>
@@ -339,24 +386,48 @@
     const NULL_LIMIT = -900;
     const G = 9.80665;
     const MPA_PER_PSI = 0.00689476;
+
+    // Typical West-Siberia (Khanty-Mansiysk) stratigraphic column used to
+    // label lithology zones on the plot. Depths (m MD) match the synthetic
+    // West_Siberia_Well1_4000m.las; adjust for a real well's formation tops.
+    const LITHO_ZONES = [
+      { top: 0,    bottom: 50,   name: "Q-N",    full: "Quaternary-Neogene (unconsolidated)", color: "#e8dcc8" },
+      { top: 50,   bottom: 160,  name: "P3atl",  full: "Atlym-Novomikhaylovka Fm",            color: "#ddd0b0" },
+      { top: 160,  bottom: 700,  name: "P2-3",   full: "Chagan-Lyulinvor-Talitsa clay",        color: "#c9b896" },
+      { top: 700,  bottom: 950,  name: "K2gn",   full: "Gankinsk Fm (clay-marl)",              color: "#b8a582" },
+      { top: 950,  bottom: 1250, name: "K2br",   full: "Berezovsk Fm (opoka)",                 color: "#a8cbb7" },
+      { top: 1250, bottom: 1400, name: "K2kz",   full: "Kuznetsovsk Fm (seal)",                color: "#8fae9c" },
+      { top: 1400, bottom: 2150, name: "K1-2pk", full: "Pokur Fm (sand-clay+coal)",            color: "#e0c876" },
+      { top: 2150, bottom: 2500, name: "K1vk",   full: "Vikulovo / Khanty-Mansi Fm",           color: "#e8b96a" },
+      { top: 2500, bottom: 2750, name: "K1al",   full: "Alym Fm",                              color: "#d9a05c" },
+      { top: 2750, bottom: 3000, name: "K1ach",  full: "Achimov strata",                       color: "#c98a4c" },
+      { top: 3000, bottom: 3150, name: "J3bg",   full: "Bazhenov Fm (source rock)", color: "#4a3b3b", textColor: "#f5f0e8" },
+      { top: 3150, bottom: 3350, name: "J3vs",   full: "Vasyugan Fm",                          color: "#b57a4a" },
+      { top: 3350, bottom: 3850, name: "J1-2tm", full: "Tyumen Fm (coal-bearing)", color: "#7d6a4f", textColor: "#f5f0e8" },
+      { top: 3850, bottom: 4000, name: "PZ",     full: "Pre-Jurassic basement",     color: "#9a9a9a" },
+    ];
+
     const state = {
       sourceName: "",
       las: null,
       rows: [],
       model: [],
       shminShift: 0,
+      calibrationPoints: [],
     };
 
     const el = {
       fileInput: document.getElementById("fileInput"),
       sampleBtn: document.getElementById("sampleBtn"),
-      recalcBtn: document.getElementById("recalcBtn"),
+      addCalPointBtn: document.getElementById("addCalPointBtn"),
       plot: document.getElementById("plot"),
       summary: document.getElementById("summary"),
       status: document.getElementById("status"),
       sourceLabel: document.getElementById("sourceLabel"),
       calDepth: document.getElementById("calDepth"),
       calShmin: document.getElementById("calShmin"),
+      calPointsList: document.getElementById("calPointsList"),
+      lithoLegend: document.getElementById("lithoLegend"),
       mudWeight: document.getElementById("mudWeight"),
     };
 
@@ -510,13 +581,40 @@
       return depth > 0 ? clamp(mpa / (0.00980665 * depth), 0.75, 2.7) : 1;
     }
 
-    function computeCalibrationShift(depth, targetShmin) {
-      const nearest = state.model.reduce((best, item) => {
-        const dist = Math.abs(item.depth - depth);
-        return !best || dist < best.dist ? { item, dist } : best;
-      }, null);
-      if (!nearest) return 0;
-      return targetShmin - nearest.item.shmin;
+    // Computes the average Shmin misfit across all calibration points against
+    // the *unshifted* model, so points can be added/removed without the shift
+    // compounding on itself.
+    function computeShiftFromPoints(rows) {
+      if (!state.calibrationPoints.length || !rows.length) return 0;
+      const savedShift = state.shminShift;
+      state.shminShift = 0;
+      const baseline = buildModel(rows);
+      state.shminShift = savedShift;
+      let total = 0;
+      for (const pt of state.calibrationPoints) {
+        const nearest = baseline.reduce((best, item) => {
+          const dist = Math.abs(item.depth - pt.depth);
+          return !best || dist < best.dist ? { item, dist } : best;
+        }, null);
+        if (nearest) total += pt.shmin - nearest.item.shmin;
+      }
+      return total / state.calibrationPoints.length;
+    }
+
+    function renderCalPointsList() {
+      if (!state.calibrationPoints.length) {
+        el.calPointsList.innerHTML = '<div class="cal-point-empty">Точек ещё нет — добавьте LOT/minifrac измерение.</div>';
+        return;
+      }
+      el.calPointsList.innerHTML = state.calibrationPoints
+        .map((pt, i) => `<div class="cal-point-row"><span>◆ ${pt.depth.toFixed(1)} m &rarr; ${pt.shmin.toFixed(1)} MPa</span><button type="button" class="cal-point-remove" data-index="${i}" title="Удалить точку">&times;</button></div>`)
+        .join("");
+    }
+
+    function renderLithoLegend() {
+      el.lithoLegend.innerHTML = LITHO_ZONES
+        .map((z) => `<span><i style="background:${z.color}"></i>${z.name} — ${z.full}</span>`)
+        .join("");
     }
 
     function recalcFromRows(message) {
@@ -603,16 +701,106 @@
       ];
       const left = 52;
       const gap = 10;
-      const trackW = (w - left - 22 - gap * (tracks.length - 1)) / tracks.length;
+      const lithoW = 74;
+      const trackW = (w - left - lithoW - gap - 22 - gap * (tracks.length - 1)) / tracks.length;
       const y = (depth) => topPad + (depth - yMin) / (yMax - yMin || 1) * (h - topPad - bottomPad);
 
       drawDepthAxis(ctx, left, topPad, h - bottomPad, yMin, yMax, y);
+      drawLithoTrack(ctx, left, topPad, lithoW, h - topPad - bottomPad, y, yMin, yMax);
+
+      const curvesX0 = left + lithoW + gap;
+      const trackPositions = {};
       tracks.forEach((track, index) => {
-        const x0 = left + index * (trackW + gap);
+        const x0 = curvesX0 + index * (trackW + gap);
+        trackPositions[track.title] = { x0, w: trackW, min: track.min, max: track.max };
         drawTrack(ctx, track, x0, topPad, trackW, h - topPad - bottomPad, y);
       });
 
-      drawCalibrationMarker(ctx, left, w - 22, y);
+      drawFormationTops(ctx, curvesX0, w - 22, topPad, h - bottomPad, y, yMin, yMax);
+
+      const stressPos = trackPositions["Poroelastic stresses"];
+      if (stressPos) drawCalibrationPoints(ctx, stressPos, y);
+    }
+
+    function drawLithoTrack(ctx, x0, y0, w, h, yScale, yMin, yMax) {
+      ctx.save();
+      ctx.fillStyle = "#f8fafc";
+      ctx.fillRect(x0, 0, w, y0 - 5);
+      ctx.fillStyle = "#172033";
+      ctx.font = "bold 11px sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("Литология", x0 + w / 2, 18);
+      ctx.fillStyle = "#627089";
+      ctx.font = "10px sans-serif";
+      ctx.fillText("свиты", x0 + w / 2, 32);
+
+      ctx.strokeStyle = "#d9e0ea";
+      ctx.lineWidth = 1;
+      ctx.strokeRect(x0, y0, w, h);
+
+      LITHO_ZONES.forEach((zone) => {
+        const top = Math.max(zone.top, yMin);
+        const bottom = Math.min(zone.bottom, yMax);
+        if (bottom <= top) return;
+        const yTop = yScale(top);
+        const yBottom = yScale(bottom);
+        ctx.fillStyle = zone.color;
+        ctx.fillRect(x0 + 1, yTop, w - 2, Math.max(1, yBottom - yTop));
+        if (yBottom - yTop > 15) {
+          ctx.fillStyle = zone.textColor || "#1f2937";
+          ctx.font = "9px sans-serif";
+          ctx.textAlign = "center";
+          ctx.fillText(zone.name, x0 + w / 2, (yTop + yBottom) / 2 + 3);
+        }
+      });
+      ctx.strokeStyle = "#9aa6b6";
+      LITHO_ZONES.forEach((zone) => {
+        if (zone.top <= yMin || zone.top >= yMax) return;
+        ctx.beginPath();
+        ctx.moveTo(x0, yScale(zone.top));
+        ctx.lineTo(x0 + w, yScale(zone.top));
+        ctx.stroke();
+      });
+      ctx.restore();
+    }
+
+    function drawFormationTops(ctx, x0, x1, yTop, yBottom, yScale, yMin, yMax) {
+      ctx.save();
+      ctx.strokeStyle = "rgba(100,116,139,0.32)";
+      ctx.setLineDash([3, 4]);
+      ctx.lineWidth = 1;
+      const tops = new Set(LITHO_ZONES.map((z) => z.top));
+      tops.forEach((depth) => {
+        if (depth <= yMin || depth >= yMax) return;
+        const py = yScale(depth);
+        ctx.beginPath();
+        ctx.moveTo(x0, py);
+        ctx.lineTo(x1, py);
+        ctx.stroke();
+      });
+      ctx.setLineDash([]);
+      ctx.restore();
+    }
+
+    function drawCalibrationPoints(ctx, pos, yScale) {
+      if (!state.calibrationPoints.length) return;
+      ctx.save();
+      state.calibrationPoints.forEach((pt) => {
+        const px = pos.x0 + clamp((pt.shmin - pos.min) / (pos.max - pos.min || 1), 0, 1) * pos.w;
+        const py = yScale(pt.depth);
+        ctx.fillStyle = "#7c3aed";
+        ctx.strokeStyle = "#3b0764";
+        ctx.lineWidth = 1.4;
+        ctx.beginPath();
+        ctx.moveTo(px, py - 6);
+        ctx.lineTo(px + 6, py);
+        ctx.lineTo(px, py + 6);
+        ctx.lineTo(px - 6, py);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+      });
+      ctx.restore();
     }
 
     function drawDepthAxis(ctx, x, yTop, yBottom, minDepth, maxDepth, yScale) {
@@ -723,24 +911,6 @@
       ctx.fillText(curve.label, x0 + 5, 50 + Math.random() * 0);
     }
 
-    function drawCalibrationMarker(ctx, xMin, xMax, yScale) {
-      const depth = Number(el.calDepth.value);
-      if (!Number.isFinite(depth) || !state.model.length) return;
-      const y = yScale(depth);
-      ctx.strokeStyle = "#7c3aed";
-      ctx.lineWidth = 1.5;
-      ctx.setLineDash([6, 5]);
-      ctx.beginPath();
-      ctx.moveTo(xMin, y);
-      ctx.lineTo(xMax, y);
-      ctx.stroke();
-      ctx.setLineDash([]);
-      ctx.fillStyle = "#7c3aed";
-      ctx.font = "12px sans-serif";
-      ctx.textAlign = "left";
-      ctx.fillText("Shmin calibration", xMin + 8, y - 7);
-    }
-
     function maxOf(rows, keys) {
       return rows.reduce((max, row) => Math.max(max, ...keys.map((key) => safe(row[key], -Infinity))), -Infinity);
     }
@@ -763,10 +933,12 @@
       state.las = parsed;
       state.rows = parsed.rows;
       state.shminShift = 0;
+      state.calibrationPoints = [];
       el.calDepth.value = "";
       el.calShmin.value = "";
       state.model = buildModel(state.rows);
       updateDefaultCalibration();
+      renderCalPointsList();
       el.sourceLabel.textContent = `Источник: ${name}`;
       render();
       setStatus(`LAS загружен: ${parsed.rows.length} строк, ${parsed.curves.length} кривых.`);
@@ -832,19 +1004,39 @@
       setStatus("Построен синтетический пример.");
     });
 
-    el.recalcBtn.addEventListener("click", () => {
+    el.addCalPointBtn.addEventListener("click", () => {
       if (!state.rows.length) return;
       const depth = Number(el.calDepth.value);
       const target = Number(el.calShmin.value);
-      if (Number.isFinite(depth) && Number.isFinite(target)) {
-        state.shminShift += computeCalibrationShift(depth, target);
+      if (!Number.isFinite(depth) || !Number.isFinite(target)) {
+        setStatus("Укажите глубину и измеренное значение Shmin для добавления точки.");
+        return;
       }
+      state.calibrationPoints.push({ depth, shmin: target });
+      state.shminShift = computeShiftFromPoints(state.rows);
       state.model = buildModel(state.rows);
+      renderCalPointsList();
       render();
-      setStatus(`Пересчитано. Калибровочный сдвиг Shmin: ${state.shminShift.toFixed(2)} MPa.`);
+      setStatus(`Точка добавлена (◆ на графике). Калибровочный сдвиг Shmin: ${state.shminShift.toFixed(2)} MPa (среднее по ${state.calibrationPoints.length} точ.).`);
+      el.calDepth.value = "";
+      el.calShmin.value = "";
+    });
+
+    el.calPointsList.addEventListener("click", (event) => {
+      const btn = event.target.closest(".cal-point-remove");
+      if (!btn) return;
+      const idx = Number(btn.dataset.index);
+      state.calibrationPoints.splice(idx, 1);
+      state.shminShift = computeShiftFromPoints(state.rows);
+      state.model = buildModel(state.rows);
+      renderCalPointsList();
+      render();
+      setStatus(`Точка удалена. Калибровочный сдвиг Shmin: ${state.shminShift.toFixed(2)} MPa.`);
     });
 
     el.mudWeight.addEventListener("change", () => recalcFromRows("Mud weight изменён, WBS пересчитана."));
+    renderLithoLegend();
+    renderCalPointsList();
     updateSummary();
     drawPlot();
     tryAutoLoad();
