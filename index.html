@@ -1,0 +1,853 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>1D Geomechanics LAS Model</title>
+  <style>
+    :root {
+      --bg: #f5f7fa;
+      --panel: #ffffff;
+      --ink: #172033;
+      --muted: #627089;
+      --line: #d9e0ea;
+      --blue: #276ef1;
+      --green: #15803d;
+      --red: #c2410c;
+      --purple: #7c3aed;
+      --orange: #d97706;
+      --shadow: 0 10px 24px rgba(23, 32, 51, 0.08);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--bg);
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      padding: 16px 20px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--line);
+      position: sticky;
+      top: 0;
+      z-index: 5;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 20px;
+      line-height: 1.2;
+    }
+
+    .subhead {
+      color: var(--muted);
+      font-size: 13px;
+      margin-top: 4px;
+    }
+
+    .top-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    input,
+    button,
+    select {
+      font: inherit;
+    }
+
+    input[type="file"] {
+      max-width: 270px;
+    }
+
+    button {
+      border: 0;
+      background: var(--blue);
+      color: white;
+      border-radius: 7px;
+      padding: 9px 12px;
+      cursor: pointer;
+      font-weight: 650;
+    }
+
+    button.secondary {
+      color: var(--ink);
+      background: #e9eef6;
+    }
+
+    button:disabled {
+      cursor: default;
+      opacity: 0.55;
+    }
+
+    main {
+      display: grid;
+      grid-template-columns: minmax(720px, 1fr) 310px;
+      gap: 16px;
+      padding: 16px;
+      min-height: calc(100vh - 73px);
+    }
+
+    .workspace {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      min-width: 0;
+    }
+
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(120px, 1fr));
+      gap: 10px;
+    }
+
+    .metric,
+    aside,
+    .plot-wrap {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+    }
+
+    .metric {
+      padding: 12px;
+    }
+
+    .metric span {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      margin-bottom: 5px;
+    }
+
+    .metric strong {
+      font-size: 18px;
+    }
+
+    .plot-wrap {
+      overflow: auto;
+      padding: 12px;
+    }
+
+    .plot-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 0 2px 10px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      min-width: 1040px;
+      height: 960px;
+      background: white;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+    }
+
+    aside {
+      padding: 14px;
+      height: fit-content;
+      position: sticky;
+      top: 90px;
+    }
+
+    aside h2,
+    aside h3 {
+      margin: 0 0 10px;
+      font-size: 16px;
+    }
+
+    aside h3 {
+      margin-top: 18px;
+      font-size: 14px;
+      color: var(--muted);
+    }
+
+    .field {
+      margin: 11px 0;
+    }
+
+    .field label {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      color: var(--muted);
+      font-size: 12px;
+      margin-bottom: 5px;
+    }
+
+    .field input,
+    .field select {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      padding: 8px 9px;
+      color: var(--ink);
+      background: white;
+    }
+
+    .status {
+      min-height: 38px;
+      padding: 9px 10px;
+      border-radius: 7px;
+      background: #edf4ff;
+      color: #1d4ed8;
+      font-size: 13px;
+      line-height: 1.35;
+      margin-top: 10px;
+    }
+
+    .legend {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px 12px;
+      margin-top: 14px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .legend i {
+      display: inline-block;
+      width: 18px;
+      height: 3px;
+      border-radius: 2px;
+      vertical-align: middle;
+      margin-right: 6px;
+    }
+
+    .note {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.42;
+      margin-top: 13px;
+    }
+
+    @media (max-width: 1100px) {
+      main {
+        grid-template-columns: 1fr;
+      }
+
+      aside {
+        position: static;
+      }
+
+      .summary {
+        grid-template-columns: repeat(2, minmax(120px, 1fr));
+      }
+    }
+
+    @media (max-width: 700px) {
+      header {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      main {
+        padding: 10px;
+      }
+
+      .summary {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>1D геомеханическая модель по LAS</h1>
+      <div class="subhead">LAS → упругие свойства → poroelastic normal stress regime → WBS + кавернометрия</div>
+    </div>
+    <div class="top-actions">
+      <input id="fileInput" type="file" accept=".las,.LAS,text/plain">
+      <button id="sampleBtn" class="secondary" type="button">Синтетический пример</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="workspace">
+      <div class="summary" id="summary"></div>
+      <div class="plot-wrap">
+        <div class="plot-title">
+          <span id="sourceLabel">Источник: ожидание LAS</span>
+          <span>Планшет кривых: GR, пористость, упругие свойства, стрессы, WBS, кавернометрия</span>
+        </div>
+        <canvas id="plot" width="1280" height="960"></canvas>
+      </div>
+    </section>
+
+    <aside>
+      <h2>Калибровка Shmin</h2>
+      <div class="field">
+        <label for="stressRegime">Режим стрессов</label>
+        <select id="stressRegime">
+          <option value="normal" selected>Normal: Sv &gt; SHmax &gt; Shmin</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="calDepth">Глубина точки, m</label>
+        <input id="calDepth" type="number" step="0.1">
+      </div>
+      <div class="field">
+        <label for="calShmin">Shmin в точке, MPa</label>
+        <input id="calShmin" type="number" step="0.1">
+      </div>
+      <div class="field">
+        <label for="mudWeight">Текущий mud weight, SG</label>
+        <input id="mudWeight" type="number" min="0.8" max="2.8" step="0.01" value="1.20">
+      </div>
+      <button id="recalcBtn" type="button">Пересчитать стрессы и WBS</button>
+      <div class="status" id="status">Загрузите LAS-файл или используйте пример.</div>
+
+      <h3>Кривые</h3>
+      <div class="legend">
+        <span><i style="background:#15803d"></i>GR / gamma</span>
+        <span><i style="background:#276ef1"></i>E static</span>
+        <span><i style="background:#7c3aed"></i>Fang</span>
+        <span><i style="background:#111827"></i>Sv</span>
+        <span><i style="background:#d97706"></i>Shmin</span>
+        <span><i style="background:#c2410c"></i>SHmax</span>
+        <span><i style="background:#0891b2"></i>Collapse MW</span>
+        <span><i style="background:#dc2626"></i>Fracture MW</span>
+      </div>
+      <p class="note">
+        Временные корреляции намеренно простые: Fang считается по gamma ray, UCS и упругие свойства выводятся из sonic/density или fallback-корреляций. Когда `pes1` добавит LAS в git, положите его в `data/pes1.las` или загрузите вручную.
+      </p>
+    </aside>
+  </main>
+
+  <script>
+    const NULL_LIMIT = -900;
+    const G = 9.80665;
+    const MPA_PER_PSI = 0.00689476;
+    const state = {
+      sourceName: "",
+      las: null,
+      rows: [],
+      model: [],
+      shminShift: 0,
+    };
+
+    const el = {
+      fileInput: document.getElementById("fileInput"),
+      sampleBtn: document.getElementById("sampleBtn"),
+      recalcBtn: document.getElementById("recalcBtn"),
+      plot: document.getElementById("plot"),
+      summary: document.getElementById("summary"),
+      status: document.getElementById("status"),
+      sourceLabel: document.getElementById("sourceLabel"),
+      calDepth: document.getElementById("calDepth"),
+      calShmin: document.getElementById("calShmin"),
+      mudWeight: document.getElementById("mudWeight"),
+    };
+
+    function cleanMnemonic(text) {
+      return String(text || "").split(".")[0].trim().toUpperCase();
+    }
+
+    function parseLas(text) {
+      const lines = text.replace(/\r/g, "").split("\n");
+      const curves = [];
+      const dataLines = [];
+      let section = "";
+      let nullValue = -999.25;
+
+      for (const raw of lines) {
+        const line = raw.trim();
+        if (!line || line.startsWith("#")) continue;
+        if (line.startsWith("~")) {
+          section = line.slice(1, 2).toUpperCase();
+          continue;
+        }
+        if (section === "W" && /^NULL/i.test(line)) {
+          const match = line.match(/NULL\s*\.[^\s]*\s+(-?\d+(?:\.\d+)?)/i);
+          if (match) nullValue = Number(match[1]);
+        }
+        if (section === "C") {
+          const mnemonic = cleanMnemonic(line);
+          if (mnemonic && !mnemonic.startsWith("~")) curves.push(mnemonic);
+        }
+        if (section === "A") dataLines.push(line);
+      }
+
+      if (!curves.length || !dataLines.length) {
+        throw new Error("Не удалось найти секции ~Curve и ~Ascii в LAS.");
+      }
+
+      const rows = dataLines.map((line) => {
+        const values = line.split(/\s+/).map(Number);
+        const row = {};
+        curves.forEach((curve, index) => {
+          const value = values[index];
+          row[curve] = Number.isFinite(value) && Math.abs(value - nullValue) > 1e-6 && value > NULL_LIMIT ? value : null;
+        });
+        return row;
+      }).filter((row) => depthValue(row) !== null);
+
+      rows.sort((a, b) => depthValue(a) - depthValue(b));
+      return { curves, rows, nullValue };
+    }
+
+    function depthValue(row) {
+      return row.DEPT ?? row.DEPTH ?? row.MD ?? row.TVD ?? null;
+    }
+
+    function firstValue(row, names) {
+      for (const name of names) {
+        if (row[name] !== null && row[name] !== undefined && Number.isFinite(row[name])) return row[name];
+      }
+      return null;
+    }
+
+    function clamp(value, min, max) {
+      return Math.min(max, Math.max(min, value));
+    }
+
+    function safe(value, fallback) {
+      return Number.isFinite(value) ? value : fallback;
+    }
+
+    function buildModel(rows) {
+      let sv = 0;
+      let lastDepth = depthValue(rows[0]);
+      const firstDepth = lastDepth;
+      const model = [];
+
+      for (const row of rows) {
+        const depth = depthValue(row);
+        const dz = Math.max(0, depth - lastDepth);
+        const gr = safe(firstValue(row, ["GR", "GAMMA", "CGR", "SGR"]), 75);
+        const rhobRaw = firstValue(row, ["RHOB", "RHOZ", "DEN", "DENS"]);
+        const rhob = clamp(safe(rhobRaw, 2.18 + 0.0025 * (depth - firstDepth)), 1.85, 2.75);
+        const dt = firstValue(row, ["DT", "DTC", "AC", "SONIC"]);
+        const dts = firstValue(row, ["DTS", "DTSM"]);
+        const cali = firstValue(row, ["CALI", "CAL", "HCAL", "DCAL"]);
+        const bit = firstValue(row, ["BS", "BITSIZE", "BIT"]) ?? 8.5;
+        const vp = dt ? 304800 / dt : clamp(5200 - gr * 18 + (rhob - 2.2) * 1300, 2200, 5600);
+        const vs = dts ? 304800 / dts : clamp(vp * (0.52 + (rhob - 2.35) * 0.08), 1100, 3400);
+        const rhoKg = rhob * 1000;
+        const mu = rhoKg * vs * vs / 1e9;
+        const lambda = rhoKg * (vp * vp - 2 * vs * vs) / 1e9;
+        const youngDyn = clamp(mu * (3 * lambda + 2 * mu) / (lambda + mu), 2, 90);
+        const youngStatic = clamp(0.62 * youngDyn - 1.6, 1, 55);
+        const poisson = clamp(lambda / (2 * (lambda + mu)), 0.12, 0.42);
+        const phi = clamp(safe(firstValue(row, ["NPHI", "PHIN", "PHI"]), (2.65 - rhob) / (2.65 - 1.05)), 0.02, 0.38);
+        const fang = clamp(42 - 0.115 * gr, 18, 42);
+        const cohesion = clamp(5 + youngStatic * 0.32 - phi * 8 - gr * 0.018, 2, 28);
+        const ucs = clamp(2 * cohesion * Math.cos(rad(fang)) / (1 - Math.sin(rad(fang))), 8, 130);
+        sv += rhoKg * G * dz / 1e6;
+        const pp = 0.0102 * depth;
+        const biot = clamp(0.72 + phi * 0.55, 0.68, 0.95);
+        const k0 = poisson / (1 - poisson);
+        let shmin = pp + k0 * (sv - pp) + state.shminShift;
+        shmin = Math.min(shmin, sv - 0.5);
+        const shmax = Math.min(sv - 0.2, shmin + 0.35 * (sv - shmin) + 0.08 * youngStatic);
+        const mud = Number(el.mudWeight.value) || 1.2;
+        const tensile = 1.2 + youngStatic * 0.035;
+        const collapsePressure = Math.max(pp + 0.2, (3 * shmax - shmin - ucs - pp) / 2);
+        const fracturePressure = Math.max(shmin + tensile, pp + 0.5);
+        const collapseMw = pressureToSg(collapsePressure, depth);
+        const fractureMw = pressureToSg(fracturePressure, depth);
+        const currentPw = sgToPressure(mud, depth);
+        const breakout = currentPw < collapsePressure ? "collapse" : currentPw > fracturePressure ? "fracture" : "stable";
+
+        model.push({
+          depth,
+          gr,
+          rhob,
+          phi,
+          vp,
+          vs,
+          youngStatic,
+          poisson,
+          fang,
+          cohesion,
+          ucs,
+          sv,
+          pp,
+          biot,
+          shmin,
+          shmax,
+          collapseMw,
+          fractureMw,
+          cali: cali ?? bit + Math.max(0, collapseMw - mud) * 0.9 + Math.max(0, gr - 115) * 0.012,
+          bit,
+          breakout,
+        });
+        lastDepth = depth;
+      }
+      return model;
+    }
+
+    function rad(deg) {
+      return deg * Math.PI / 180;
+    }
+
+    function sgToPressure(sg, depth) {
+      return sg * 0.00980665 * depth;
+    }
+
+    function pressureToSg(mpa, depth) {
+      return depth > 0 ? clamp(mpa / (0.00980665 * depth), 0.75, 2.7) : 1;
+    }
+
+    function computeCalibrationShift(depth, targetShmin) {
+      const nearest = state.model.reduce((best, item) => {
+        const dist = Math.abs(item.depth - depth);
+        return !best || dist < best.dist ? { item, dist } : best;
+      }, null);
+      if (!nearest) return 0;
+      return targetShmin - nearest.item.shmin;
+    }
+
+    function recalcFromRows(message) {
+      if (!state.rows.length) return;
+      state.model = buildModel(state.rows);
+      updateDefaultCalibration();
+      render();
+      setStatus(message || "Модель пересчитана.");
+    }
+
+    function updateDefaultCalibration() {
+      if (!state.model.length || el.calDepth.value) return;
+      const mid = state.model[Math.floor(state.model.length / 2)];
+      el.calDepth.value = mid.depth.toFixed(1);
+      el.calShmin.value = mid.shmin.toFixed(1);
+    }
+
+    function setStatus(message) {
+      el.status.textContent = message;
+    }
+
+    function metric(label, value) {
+      return `<div class="metric"><span>${label}</span><strong>${value}</strong></div>`;
+    }
+
+    function updateSummary() {
+      const m = state.model;
+      if (!m.length) {
+        el.summary.innerHTML = [
+          metric("LAS", "нет данных"),
+          metric("Интервал", "-"),
+          metric("Кривые", "-"),
+          metric("Режим", "normal"),
+          metric("Калибровка", "ожидает"),
+        ].join("");
+        return;
+      }
+      const top = m[0].depth.toFixed(1);
+      const base = m[m.length - 1].depth.toFixed(1);
+      const avg = (key) => m.reduce((sum, row) => sum + row[key], 0) / m.length;
+      el.summary.innerHTML = [
+        metric("Точек модели", m.length.toLocaleString("ru-RU")),
+        metric("Интервал MD", `${top}-${base} m`),
+        metric("E static avg", `${avg("youngStatic").toFixed(1)} GPa`),
+        metric("Fang avg", `${avg("fang").toFixed(1)}°`),
+        metric("Shmin shift", `${state.shminShift.toFixed(2)} MPa`),
+      ].join("");
+    }
+
+    function render() {
+      updateSummary();
+      drawPlot();
+    }
+
+    function drawPlot() {
+      const canvas = el.plot;
+      const ctx = canvas.getContext("2d");
+      const w = canvas.width;
+      const h = canvas.height;
+      ctx.clearRect(0, 0, w, h);
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(0, 0, w, h);
+
+      if (!state.model.length) {
+        ctx.fillStyle = "#627089";
+        ctx.font = "18px sans-serif";
+        ctx.fillText("Загрузите LAS-файл, чтобы построить планшет.", 40, 80);
+        return;
+      }
+
+      const m = state.model;
+      const topPad = 54;
+      const bottomPad = 22;
+      const yMin = m[0].depth;
+      const yMax = m[m.length - 1].depth;
+      const tracks = [
+        { title: "GR / Gamma", keys: [{ k: "gr", c: "#15803d", label: "GR" }], min: 0, max: 160, unit: "API" },
+        { title: "Porosity", keys: [{ k: "phi", c: "#276ef1", label: "PHI" }], min: 0, max: 0.4, unit: "v/v" },
+        { title: "Elastic", keys: [{ k: "youngStatic", c: "#276ef1", label: "E" }, { k: "poisson", c: "#7c3aed", label: "Nu", scale: 100 }], min: 0, max: 60, unit: "GPa / Nu*100" },
+        { title: "Strength", keys: [{ k: "ucs", c: "#c2410c", label: "UCS" }, { k: "fang", c: "#7c3aed", label: "Fang" }], min: 0, max: 140, unit: "MPa / deg" },
+        { title: "Poroelastic stresses", keys: [{ k: "sv", c: "#111827", label: "Sv" }, { k: "shmin", c: "#d97706", label: "Shmin" }, { k: "shmax", c: "#c2410c", label: "SHmax" }, { k: "pp", c: "#2563eb", label: "Pp" }], min: 0, max: maxOf(m, ["sv", "shmax"]) * 1.1, unit: "MPa" },
+        { title: "WBS", keys: [{ k: "collapseMw", c: "#0891b2", label: "Collapse" }, { k: "fractureMw", c: "#dc2626", label: "Fracture" }], min: 0.8, max: 2.4, unit: "SG" },
+        { title: "Cavernometry", keys: [{ k: "bit", c: "#111827", label: "Bit" }, { k: "cali", c: "#16a34a", label: "CALI" }], min: minOf(m, ["bit", "cali"]) - 0.5, max: maxOf(m, ["bit", "cali"]) + 1, unit: "in" },
+      ];
+      const left = 52;
+      const gap = 10;
+      const trackW = (w - left - 22 - gap * (tracks.length - 1)) / tracks.length;
+      const y = (depth) => topPad + (depth - yMin) / (yMax - yMin || 1) * (h - topPad - bottomPad);
+
+      drawDepthAxis(ctx, left, topPad, h - bottomPad, yMin, yMax, y);
+      tracks.forEach((track, index) => {
+        const x0 = left + index * (trackW + gap);
+        drawTrack(ctx, track, x0, topPad, trackW, h - topPad - bottomPad, y);
+      });
+
+      drawCalibrationMarker(ctx, left, w - 22, y);
+    }
+
+    function drawDepthAxis(ctx, x, yTop, yBottom, minDepth, maxDepth, yScale) {
+      ctx.strokeStyle = "#9aa6b6";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(x - 12, yTop);
+      ctx.lineTo(x - 12, yBottom);
+      ctx.stroke();
+      ctx.fillStyle = "#334155";
+      ctx.font = "12px sans-serif";
+      ctx.textAlign = "right";
+      ctx.fillText("MD, m", x - 16, 28);
+      const step = niceStep((maxDepth - minDepth) / 10);
+      const start = Math.ceil(minDepth / step) * step;
+      for (let d = start; d <= maxDepth; d += step) {
+        const y = yScale(d);
+        ctx.strokeStyle = "#edf1f7";
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(ctx.canvas.width - 22, y);
+        ctx.stroke();
+        ctx.fillStyle = "#627089";
+        ctx.fillText(d.toFixed(0), x - 16, y + 4);
+      }
+    }
+
+    function drawTrack(ctx, track, x0, y0, w, h, yScale) {
+      ctx.save();
+      ctx.strokeStyle = "#d9e0ea";
+      ctx.lineWidth = 1;
+      ctx.strokeRect(x0, y0, w, h);
+      ctx.fillStyle = "#f8fafc";
+      ctx.fillRect(x0, 0, w, y0 - 5);
+      ctx.fillStyle = "#172033";
+      ctx.font = "bold 12px sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText(track.title, x0 + w / 2, 18);
+      ctx.fillStyle = "#627089";
+      ctx.font = "11px sans-serif";
+      ctx.fillText(`${track.min.toFixed(track.max <= 3 ? 1 : 0)} - ${track.max.toFixed(track.max <= 3 ? 1 : 0)} ${track.unit}`, x0 + w / 2, 35);
+      drawVerticalGrid(ctx, x0, y0, w, h, 4);
+      if (track.title === "WBS") drawWbsFill(ctx, x0, y0, w, h, track.min, track.max, yScale);
+      track.keys.forEach((curve) => drawCurve(ctx, x0, w, track.min, track.max, yScale, curve));
+      ctx.restore();
+    }
+
+    function drawVerticalGrid(ctx, x0, y0, w, h, count) {
+      ctx.strokeStyle = "#edf1f7";
+      for (let i = 1; i < count; i++) {
+        const x = x0 + w * i / count;
+        ctx.beginPath();
+        ctx.moveTo(x, y0);
+        ctx.lineTo(x, y0 + h);
+        ctx.stroke();
+      }
+    }
+
+    function drawWbsFill(ctx, x0, y0, w, h, min, max, yScale) {
+      const mud = Number(el.mudWeight.value) || 1.2;
+      const x = (value) => x0 + clamp((value - min) / (max - min), 0, 1) * w;
+      ctx.fillStyle = "rgba(22, 163, 74, 0.08)";
+      ctx.beginPath();
+      state.model.forEach((row, i) => {
+        const px = x(row.collapseMw);
+        const py = yScale(row.depth);
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      });
+      [...state.model].reverse().forEach((row) => ctx.lineTo(x(row.fractureMw), yScale(row.depth)));
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = "#111827";
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath();
+      ctx.moveTo(x(mud), y0);
+      ctx.lineTo(x(mud), y0 + h);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    function drawCurve(ctx, x0, w, min, max, yScale, curve) {
+      const x = (value) => x0 + clamp((value - min) / (max - min), 0, 1) * w;
+      ctx.strokeStyle = curve.c;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      let started = false;
+      for (const row of state.model) {
+        const raw = row[curve.k];
+        const value = curve.scale ? raw * curve.scale : raw;
+        if (!Number.isFinite(value)) {
+          started = false;
+          continue;
+        }
+        const px = x(value);
+        const py = yScale(row.depth);
+        if (!started) {
+          ctx.moveTo(px, py);
+          started = true;
+        } else {
+          ctx.lineTo(px, py);
+        }
+      }
+      ctx.stroke();
+      ctx.fillStyle = curve.c;
+      ctx.font = "10px sans-serif";
+      ctx.textAlign = "left";
+      ctx.fillText(curve.label, x0 + 5, 50 + Math.random() * 0);
+    }
+
+    function drawCalibrationMarker(ctx, xMin, xMax, yScale) {
+      const depth = Number(el.calDepth.value);
+      if (!Number.isFinite(depth) || !state.model.length) return;
+      const y = yScale(depth);
+      ctx.strokeStyle = "#7c3aed";
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([6, 5]);
+      ctx.beginPath();
+      ctx.moveTo(xMin, y);
+      ctx.lineTo(xMax, y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = "#7c3aed";
+      ctx.font = "12px sans-serif";
+      ctx.textAlign = "left";
+      ctx.fillText("Shmin calibration", xMin + 8, y - 7);
+    }
+
+    function maxOf(rows, keys) {
+      return rows.reduce((max, row) => Math.max(max, ...keys.map((key) => safe(row[key], -Infinity))), -Infinity);
+    }
+
+    function minOf(rows, keys) {
+      return rows.reduce((min, row) => Math.min(min, ...keys.map((key) => safe(row[key], Infinity))), Infinity);
+    }
+
+    function niceStep(raw) {
+      const pow = Math.pow(10, Math.floor(Math.log10(raw || 1)));
+      const ratio = raw / pow;
+      if (ratio < 2) return pow;
+      if (ratio < 5) return 2 * pow;
+      return 5 * pow;
+    }
+
+    function loadLasText(text, name) {
+      const parsed = parseLas(text);
+      state.sourceName = name;
+      state.las = parsed;
+      state.rows = parsed.rows;
+      state.shminShift = 0;
+      el.calDepth.value = "";
+      el.calShmin.value = "";
+      state.model = buildModel(state.rows);
+      updateDefaultCalibration();
+      el.sourceLabel.textContent = `Источник: ${name}`;
+      render();
+      setStatus(`LAS загружен: ${parsed.rows.length} строк, ${parsed.curves.length} кривых.`);
+    }
+
+    function makeSyntheticLas() {
+      const curves = ["DEPT", "GR", "RHOB", "DT", "DTS", "NPHI", "CALI", "BS"];
+      const lines = [
+        "~Version", "VERS. 2.0", "WRAP. NO",
+        "~Well", "NULL. -999.25", "WELL. SYNTHETIC_GEOMECH_1D",
+        "~Curve",
+        "DEPT.M : Depth", "GR.API : Gamma Ray", "RHOB.G/C3 : Bulk density",
+        "DT.US/F : Compressional sonic", "DTS.US/F : Shear sonic",
+        "NPHI.V/V : Neutron porosity", "CALI.IN : Caliper", "BS.IN : Bit size",
+        "~Ascii",
+      ];
+      for (let i = 0; i < 360; i++) {
+        const d = 1800 + i * 1.5;
+        const sand = Math.sin(i / 19) > 0.15 ? 1 : 0;
+        const gr = clamp(45 + (1 - sand) * 70 + Math.sin(i / 11) * 12 + Math.cos(i / 37) * 8, 18, 150);
+        const rhob = clamp(2.18 + i * 0.0009 + sand * 0.12 + Math.sin(i / 29) * 0.035, 2.05, 2.62);
+        const nphi = clamp(0.29 - (rhob - 2.1) * 0.22 + (1 - sand) * 0.04, 0.06, 0.34);
+        const dt = clamp(92 - (rhob - 2.2) * 28 + (1 - sand) * 8, 58, 105);
+        const dts = dt * 1.82;
+        const bs = 8.5;
+        const washout = Math.max(0, gr - 105) * 0.018 + (Math.sin(i / 9) > 0.82 ? 0.45 : 0);
+        const cali = bs + washout;
+        lines.push([d, gr, rhob, dt, dts, nphi, cali, bs].map((v) => v.toFixed(3)).join(" "));
+      }
+      return lines.join("\n");
+    }
+
+    async function tryAutoLoad() {
+      const candidates = ["data/pes1.las", "pes1.las", "well.las", "data/well.las"];
+      for (const path of candidates) {
+        try {
+          const response = await fetch(path, { cache: "no-store" });
+          if (response.ok) {
+            const text = await response.text();
+            loadLasText(text, path);
+            return;
+          }
+        } catch (error) {
+          // Local file:// pages cannot fetch relative files in some browsers.
+        }
+      }
+      loadLasText(makeSyntheticLas(), "synthetic fallback");
+      setStatus("LAS в git пока не найден. Построен синтетический пример; можно загрузить файл вручную.");
+    }
+
+    el.fileInput.addEventListener("change", async (event) => {
+      const file = event.target.files[0];
+      if (!file) return;
+      try {
+        loadLasText(await file.text(), file.name);
+      } catch (error) {
+        setStatus(error.message);
+      }
+    });
+
+    el.sampleBtn.addEventListener("click", () => {
+      loadLasText(makeSyntheticLas(), "synthetic fallback");
+      setStatus("Построен синтетический пример.");
+    });
+
+    el.recalcBtn.addEventListener("click", () => {
+      if (!state.rows.length) return;
+      const depth = Number(el.calDepth.value);
+      const target = Number(el.calShmin.value);
+      if (Number.isFinite(depth) && Number.isFinite(target)) {
+        state.shminShift += computeCalibrationShift(depth, target);
+      }
+      state.model = buildModel(state.rows);
+      render();
+      setStatus(`Пересчитано. Калибровочный сдвиг Shmin: ${state.shminShift.toFixed(2)} MPa.`);
+    });
+
+    el.mudWeight.addEventListener("change", () => recalcFromRows("Mud weight изменён, WBS пересчитана."));
+    updateSummary();
+    drawPlot();
+    tryAutoLoad();
+  </script>
+</body>
+</html>
