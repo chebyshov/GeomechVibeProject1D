@@ -4,7 +4,32 @@
 
 Собрать расчетное ядро MVP для 1D геомеханики: units, depth validation, vertical stress, hydrostatic pore pressure and effective stress.
 
-## Task 1: Units Module
+Status: first pass implemented in `app/core` with `unittest` coverage. Next step is to connect this core to real LAS/CSV import workflow and expand benchmark cases.
+
+## Next Task 1: CSV/LAS Import Bridge
+
+Goal: связать расчетное ядро с реальными входными файлами.
+
+Acceptance criteria:
+
+- CSV import supports mapped depth and density columns;
+- LAS import extracts `DEPT/TVD` and `RHOB`;
+- invalid or missing units produce clear errors;
+- example calculation can run on a real/synthetic LAS-derived table.
+
+## Next Task 2: Benchmark Expansion
+
+Goal: добавить benchmark cases из `docs/validation-cases.md`.
+
+Acceptance criteria:
+
+- case 002 hydrostatic pore pressure;
+- case 003 effective stress;
+- case 005 non-monotonic depth;
+- expected outputs are stored in benchmark folders;
+- all benchmarks run from one command.
+
+## Completed Task 1: Units Module
 
 Goal: сделать единый модуль конвертации единиц.
 
@@ -16,7 +41,7 @@ Acceptance criteria:
 - mud weight conversion: SG <-> ppg;
 - tests for all conversions.
 
-## Task 2: Depth Validation
+## Completed Task 2: Depth Validation
 
 Goal: запретить расчеты на некорректной глубине.
 
@@ -27,7 +52,7 @@ Acceptance criteria:
 - decreasing TVD fails;
 - NaN depth fails.
 
-## Task 3: Vertical Stress
+## Completed Task 3: Vertical Stress
 
 Goal: рассчитать `Sv` интегрированием плотности по TVD.
 
@@ -39,7 +64,7 @@ Acceptance criteria:
 - raises error for invalid density;
 - documents assumptions.
 
-## Task 4: Hydrostatic Pore Pressure
+## Completed Task 4: Hydrostatic Pore Pressure
 
 Goal: рассчитать базовое `Pp`.
 
@@ -49,7 +74,7 @@ Acceptance criteria:
 - fluid density is configurable;
 - output in MPa.
 
-## Task 5: Effective Stress
+## Completed Task 5: Effective Stress
 
 Goal: рассчитать эффективные напряжения.
 

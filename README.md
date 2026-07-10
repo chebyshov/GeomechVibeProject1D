@@ -15,6 +15,35 @@ claude
 Current state: the repository has been initialized and connected to GitHub.
 Project source files can be added here as the work develops.
 
+## Calculation Core MVP
+
+The first Python calculation core lives in `app/core`.
+
+It currently provides:
+
+- unit conversions for depth, density, pressure, and mud weight;
+- strict TVD validation;
+- vertical stress integration from density;
+- hydrostatic pore pressure;
+- effective stress with Biot coefficient;
+- benchmark input for the constant-density case.
+
+Run tests:
+
+```bash
+python3 -m unittest discover -s tests
+```
+
+Run the MVP calculation example:
+
+```bash
+python3 -m app \
+  --input benchmarks/case_001_constant_density/input.csv \
+  --output examples/mvp_results.csv
+```
+
+The example writes `TVD_m`, `RHOB_g_cm3`, `Sv_MPa`, `Pp_MPa`, and `SvEff_MPa`.
+
 ## 1D Geomechanics HTML Model
 
 Open `index.html` in a browser to run the current prototype. The page can:
